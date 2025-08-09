@@ -1,0 +1,163 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Papaya Padel</title>
+  <style>
+    body{font-family:Inter,Arial,Helvetica,sans-serif;background:#fbfbfc;color:#222;margin:0;padding:20px;}
+    .container{max-width:1100px;margin:0 auto;}
+    header{display:flex;align-items:center;gap:16px}
+    .logo{height:64px}
+    .card{background:#fff;padding:14px;border-radius:10px;box-shadow:0 6px 18px rgba(0,0,0,0.06);}
+    .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:16px;margin-top:16px}
+    button{background:#39A96B;color:#fff;border:none;padding:10px 14px;border-radius:10px;cursor:pointer}
+    input,select{padding:8px;border-radius:8px;border:1px solid #ddd;margin:6px 0;width:100%}
+    .muted{color:#666;font-size:14px}
+    .small{font-size:13px;color:#777}
+    .actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
+    .panel{margin-top:18px;padding:12px;border-radius:8px;background:#fff}
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <img src="/logo.png" class="logo" alt="logo" />
+      <div>
+        <h1 style="margin:0">Papaya Padel</h1>
+        <div class="muted">Torneos · Inscripciones · Administración</div>
+      </div>
+    </header>
+
+    <div style="margin-top:18px">
+      <div class="actions">
+        <button id="seedBtn">Crear torneos demo</button>
+        <button id="showAdmin">Abrir panel</button>
+      </div>
+    </div>
+
+    <section id="listSection" style="margin-top:16px">
+      <div id="tournaments" class="grid"></div>
+    </section>
+
+    <section id="panel" class="panel" style="display:none">
+      <h3>Panel (register / login / acciones)</h3>
+      <div style="display:flex;gap:12;flex-wrap:wrap">
+        <div style="flex:1;min-width:240px;" class="card">
+          <h4>Registrar usuario</h4>
+          <input id="reg_name" placeholder="Nombre" />
+          <input id="reg_email" placeholder="Email" />
+          <input id="reg_pass" type="password" placeholder="Password" />
+          <select id="reg_role"><option value="jugador">Jugador</option><option value="club">Club</option><option value="superadmin">SuperAdmin</option></select>
+          <button id="regBtn">Registrar</button>
+          <div class="small" id="regResult"></div>
+        </div>
+
+        <div style="flex:1;min-width:240px" class="card">
+          <h4>Login</h4>
+          <input id="login_email" placeholder="Email" />
+          <input id="login_pass" type="password" placeholder="Password" />
+          <button id="loginBtn">Login</button>
+          <div class="small" id="loginResult"></div>
+        </div>
+
+        <div style="flex:1;min-width:240px" class="card">
+          <h4>Crear Torneo (necesita token club)</h4>
+          <input id="t_name" placeholder="Nombre torneo" />
+          <select id="t_format"><option value="groups_knockout">Groups + Knockout</option><option value="knockout">Knockout</option><option value="americano">Americano</option></select>
+          <input id="t_capacity" placeholder="Cupos" value="12" />
+          <button id="createTBtn">Crear</button>
+          <div class="small" id="createResult"></div>
+        </div>
+      </div>
+
+      <div style="margin-top:12px" class="card">
+        <h4>Acciones administrativas</h4>
+        <input id="approve_id" placeholder="ID torneo a aprobar" />
+        <button id="approveBtn">Aprobar (superadmin)</button>
+        <input id="gen_id" placeholder="ID torneo americano" />
+        <button id="genBtn">Generar rondas (club/superadmin)</button>
+        <div class="small" id="adminResult"></div>
+      </div>
+    </section>
+
+    <section id="matches" style="margin-top:18px"></section>
+  </div>
+
+<script>
+const apiRoot = window.location.origin;
+function show(msg){ alert(msg); }
+async function fetchTournaments(){ const res = await fetch(apiRoot + '/api/tournaments'); const data = await res.json(); renderTournaments(data); }
+function renderTournaments(list){ const el = document.getElementById('tournaments'); el.innerHTML=''; if(!list.length) el.innerHTML='<div class="card">No hay torneos. Usa Crear torneos demo.</div>'; list.forEach(t=>{ const d=document.createElement('div'); d.className='card'; d.innerHTML=`<h3>${t.name}</h3><div class="small">${t.format} · Cupos: ${t.capacity}</div><div style="margin-top:8px" class="actions"><button onclick="joinT('${t._id}','${t.format}')">Inscribirme</button><button onclick="viewMatches('${t._id}')">Ver matches</button></div>`; el.appendChild(d); }); }
+
+document.getElementById('seedBtn').addEventListener('click', async ()=>{ const r = await fetch(apiRoot + '/api/seed',{method:'POST'}); if(r.ok) { fetchTournaments(); show('Torneos demo creados'); } else show('Error creando demo'); });
+
+document.getElementById('showAdmin').addEventListener('click', ()=>{ const p=document.getElementById('panel'); p.style.display = p.style.display==='none'?'block':'none'; });
+
+document.getElementById('regBtn').addEventListener('click', async ()=>{
+  const name = document.getElementById('reg_name').value;
+  const email = document.getElementById('reg_email').value;
+  const password = document.getElementById('reg_pass').value;
+  const role = document.getElementById('reg_role').value;
+  const res = await fetch(apiRoot + '/api/register',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name,email,password,role})});
+  const j = await res.json();
+  document.getElementById('regResult').innerText = JSON.stringify(j);
+});
+
+document.getElementById('loginBtn').addEventListener('click', async ()=>{
+  const email = document.getElementById('login_email').value;
+  const password = document.getElementById('login_pass').value;
+  const res = await fetch(apiRoot + '/api/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email,password})});
+  const j = await res.json();
+  if(j.token){ localStorage.setItem('papaya_token', j.token); document.getElementById('loginResult').innerText = 'Logged in as ' + (j.user? j.user.name:''); } else document.getElementById('loginResult').innerText = JSON.stringify(j);
+});
+
+document.getElementById('createTBtn').addEventListener('click', async ()=>{
+  const token = localStorage.getItem('papaya_token');
+  if(!token) return show('Logueate como club o superadmin para crear torneo');
+  const name = document.getElementById('t_name').value;
+  const format = document.getElementById('t_format').value;
+  const capacity = parseInt(document.getElementById('t_capacity').value||12,10);
+  const res = await fetch(apiRoot + '/api/tournaments',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer ' + token},body:JSON.stringify({name,format,capacity,start_date:new Date()})});
+  const j = await res.json();
+  document.getElementById('createResult').innerText = JSON.stringify(j);
+  fetchTournaments();
+});
+
+document.getElementById('approveBtn').addEventListener('click', async ()=>{
+  const token = localStorage.getItem('papaya_token');
+  const id = document.getElementById('approve_id').value;
+  const res = await fetch(apiRoot + '/api/tournaments/' + id + '/approve',{method:'POST',headers:{'Authorization':'Bearer ' + token}});
+  const j = await res.json();
+  document.getElementById('adminResult').innerText = JSON.stringify(j);
+  fetchTournaments();
+});
+
+document.getElementById('genBtn').addEventListener('click', async ()=>{
+  const token = localStorage.getItem('papaya_token');
+  const id = document.getElementById('gen_id').value;
+  const res = await fetch(apiRoot + '/api/tournaments/' + id + '/generate-americano',{method:'POST',headers:{'Authorization':'Bearer ' + token}});
+  const j = await res.json();
+  document.getElementById('adminResult').innerText = JSON.stringify(j);
+});
+
+async function joinT(id, format){
+  const token = localStorage.getItem('papaya_token');
+  if(!token) return show('Logueate primero para inscribirte');
+  if(format !== 'americano') return show('Inscripción automática solo para americano en este demo');
+  const res = await fetch(apiRoot + '/api/tournaments/' + id + '/participants',{method:'POST',headers:{'Authorization':'Bearer ' + token}});
+  const j = await res.json();
+  show(JSON.stringify(j));
+}
+
+async function viewMatches(id){
+  const res = await fetch(apiRoot + '/api/tournaments/' + id + '/matches');
+  const j = await res.json();
+  const el = document.getElementById('matches');
+  el.innerHTML = '<h3>Matches</h3>' + (j.length? '<pre>' + JSON.stringify(j,null,2) + '</pre>' : '<div class="card">No matches yet</div>');
+}
+
+fetchTournaments();
+</script>
+</body>
+</html>
