@@ -150,10 +150,16 @@ app.get('/api/tournaments/:id/matches', async (req,res)=>{
   res.json(matches);
 });
 
+// Ruta de prueba para Railway
+app.get("/health", (req, res) => {
+  res.send("Backend running OK 🚀");
+});
+
 app.use(express.static(path.join(__dirname, '..', 'frontend_build')));
 app.get('*', (req,res)=>{
   res.sendFile(path.join(__dirname, '..', 'frontend_build', 'index.html'));
 });
 
+// Puerto dinámico para Railway
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, ()=>console.log('Server running on port', PORT));
